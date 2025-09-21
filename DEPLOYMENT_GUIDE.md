@@ -33,7 +33,7 @@ The application includes:
 ```bash
 # Configure AWS CLI with read-only credentials
 aws configure set aws_access_key_id AKIAWMFUPKUZMGWGBRQW
-aws configure set aws_secret_access_key <SECRET_KEY> K71WfvBp2D5liO7AjuyqionOI/SR+6c5hgfPeKk
+aws configure set aws_secret_access_key <SECRET_KEY> 
 aws configure set region eu-north-1
 
 # Update kubeconfig
