@@ -1,33 +1,29 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+terraform.tfplan
+terraform.tfvars
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
-*.tfvars
-.terraform
-*.tfstate*
-*.lock.hcl
+Thumbs.db
+
+# Logs
 *.log
-.vscode
-reports
-env
-oss-output
-kubeconfig_*
-.idea
-node_modules
-dist
-.venv
 
-ort-build
+# Dependencies
+node_modules/
+vendor/
 
-Chart.lock
-**/charts/*.tgz
-
-.nx/cache
-.nx/workspace-data
-
-screenshots
-# Devenv
-.devenv*
-devenv.local.nix
-
-# direnv
-.direnv
-
-.pre-commit-config.yaml
+# Build artifacts
+dist/
+build/
+target/
