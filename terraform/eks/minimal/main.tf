@@ -26,9 +26,8 @@ module "retail_app_eks" {
   source = "../../lib/eks"
 
   providers = {
-    kubernetes.cluster = kubernetes.cluster
+    kubernetes.cluster = kubernetes
     kubernetes.addons  = kubernetes
-
     helm = helm
   }
 

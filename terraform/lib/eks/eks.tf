@@ -146,7 +146,7 @@ module "eks_blueprints_addons" {
   oidc_provider_arn = module.eks_cluster.oidc_provider_arn
 
   enable_aws_load_balancer_controller = true
-  enable_cert_manager                 = true
+  enable_cert_manager                 = false
 }
 
 resource "time_sleep" "addons" {
@@ -166,7 +166,6 @@ resource "null_resource" "cluster_blocker" {
 
 resource "null_resource" "addons_blocker" {
   depends_on = [
-    time_sleep.addons,
-    aws_eks_addon.adot
+    time_sleep.addons
   ]
 }

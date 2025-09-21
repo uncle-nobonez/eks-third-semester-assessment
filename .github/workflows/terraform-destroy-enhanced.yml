@@ -1,0 +1,88 @@
+name: Terraform Destroy Enhanced
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm'
+        required: true
+        default: ''
+      target:
+        description: 'Destroy target'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - app-only
+        - infrastructure-only
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: retail-store
+
+jobs:
+  destroy-application:
+    name: Destroy Application
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'destroy' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'app-only')
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+    - name: Delete Application
+      run: |
+        kubectl delete -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml --ignore-not-found=true
+        kubectl delete ingress retail-store-ingress -n ui --ignore-not-found=true
+
+  terraform-destroy:
+    name: Terraform Destroy Infrastructure
+    runs-on: ubuntu-latest
+    needs: destroy-application
+    if: always() && github.event.inputs.confirm == 'destroy' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'infrastructure-only')
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: terraform/eks/minimal
+
+    - name: Terraform Destroy
+      run: terraform destroy -auto-approve
+      working-directory: terraform/eks/minimal
+
+    - name: Cleanup Backend Resources
+      if: github.event.inputs.target == 'all'
+      run: |
+        echo "Cleaning up backend resources..."
+        aws s3 rm s3://retail-store-terraform-state --recursive || true
+        aws s3 rb s3://retail-store-terraform-state || true
+        aws dynamodb delete-table --table-name retail-store-terraform-locks || true
+        echo "Backend cleanup completed"

@@ -4,15 +4,35 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = ">= 4.0, < 6.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.37.0"
+      version = ">= 2.0, < 3.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.17.0"
+      version = ">= 2.0, < 3.0"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0, < 4.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 3.0, < 5.0"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = ">= 0.7, < 1.0"
+    }
+    cloudinit = {
+      source  = "hashicorp/cloudinit"
+      version = ">= 2.0, < 3.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = ">= 3.0, < 4.0"
     }
   }
 }
@@ -26,13 +46,7 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.this.token
 }
 
-provider "kubernetes" {
-  alias = "cluster"
 
-  host                   = module.retail_app_eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.retail_app_eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.cluster.token
-}
 
 provider "helm" {
   kubernetes {
