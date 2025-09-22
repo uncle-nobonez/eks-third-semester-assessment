@@ -52,7 +52,7 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     
     steps:
     - name: Checkout
@@ -79,22 +79,16 @@ jobs:
                         -backend-config="dynamodb_table=retail-store-terraform-locks" \
                         -backend-config="encrypt=true"
 
-    - name: Import Existing Resources
+    - name: Handle Existing Resources
       working-directory: terraform/eks/minimal
       run: |
-        # Get KMS key ID for the existing alias
-        KMS_KEY_ID=$(aws kms describe-key --key-id alias/eks/retail-store --region ${{ env.AWS_REGION }} --query 'KeyMetadata.KeyId' --output text 2>/dev/null || echo "")
+        echo "Checking for existing resources..."
         
-        if [ ! -z "$KMS_KEY_ID" ]; then
-          echo "Importing existing KMS key and alias..."
-          terraform import module.retail_app_eks.module.eks_cluster.module.kms.aws_kms_key.this[\"cluster\"] $KMS_KEY_ID || true
-          terraform import module.retail_app_eks.module.eks_cluster.module.kms.aws_kms_alias.this[\"cluster\"] alias/eks/retail-store || true
-        fi
+        # Try to import common conflicting resources
+        terraform import aws_kms_alias.eks_cluster alias/eks/retail-store 2>/dev/null || echo "KMS alias not found or already imported"
+        terraform import aws_cloudwatch_log_group.eks_cluster /aws/eks/retail-store/cluster 2>/dev/null || echo "Log group not found or already imported"
         
-        # Import CloudWatch log group
-        terraform import module.retail_app_eks.module.eks_cluster.aws_cloudwatch_log_group.this[0] /aws/eks/retail-store/cluster || true
-        
-        echo "Resource import completed"
+        echo "Resource check completed"
 
     - name: Terraform Apply
       working-directory: terraform/eks/minimal
