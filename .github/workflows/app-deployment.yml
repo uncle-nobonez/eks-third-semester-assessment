@@ -34,8 +34,13 @@ jobs:
 
     - name: Deploy Application
       run: |
+        echo "Deploying retail store application..."
         kubectl apply -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml
+        
+        echo "Waiting for deployments to be ready..."
         kubectl wait --for=condition=available deployments --all --timeout=600s
+        
+        echo "Application deployed successfully!"
 
     - name: Get Application Status
       run: |

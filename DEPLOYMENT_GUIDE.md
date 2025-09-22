@@ -87,8 +87,9 @@ The deployment uses GitHub Actions with the following workflow:
 git clone <repository-url>
 cd retail-store-sample-app/terraform/eks/minimal
 
-# Initialize Terraform
-terraform init
+# Initialize Terraform with remote backend
+chmod +x init-backend.sh
+./init-backend.sh
 
 # Deploy infrastructure
 terraform apply
