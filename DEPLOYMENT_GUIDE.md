@@ -13,7 +13,7 @@ This deployment creates a production-grade EKS cluster on AWS with the following
 
 ### Application Access
 
-**Application URL**: http://k8s-default-ui-8c6cd7bbdd-f08607c24d54e805.elb.eu-north-1.amazonaws.com
+**Application URL**: http://k8s-default-ui-6e72e1b7e3-6a2fdb0933c0546f.elb.eu-north-1.amazonaws.com/
 
 The application includes:
 - **UI Service**: Java-based storefront
@@ -26,13 +26,13 @@ The application includes:
 
 #### Read-Only IAM User Credentials
 - **Username**: `retail-store-eks-readonly-dev`
-- **Access Key**: `AKIAWMFUPKUZMGWGBRQW`
+- **Access Key**: `AKIAWMFUPKUZN6EQ6O6S`
 - **Secret Key**: (Available in Terraform output - marked as sensitive)
 
 #### Kubectl Configuration for Developers
 ```bash
 # Configure AWS CLI with read-only credentials
-aws configure set aws_access_key_id AKIAWMFUPKUZMGWGBRQW
+aws configure set aws_access_key_id AKIAWMFUPKUZN6EQ6O6S
 aws configure set aws_secret_access_key <SECRET_KEY> 
 aws configure set region eu-north-1
 
