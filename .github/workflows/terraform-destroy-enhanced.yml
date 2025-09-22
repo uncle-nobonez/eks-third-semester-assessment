@@ -43,10 +43,27 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-    - name: Delete Application
+    - name: Delete Application and Dependencies
       run: |
+        # Delete application resources
         kubectl delete -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml --ignore-not-found=true
-        kubectl delete ingress retail-store-ingress -n ui --ignore-not-found=true
+        
+        # Wait for LoadBalancers to be deleted
+        echo "Waiting for LoadBalancers to be deleted..."
+        kubectl get svc --all-namespaces -o json | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name' | while read svc; do
+          kubectl delete svc $svc --ignore-not-found=true
+        done
+        
+        # Clean up any remaining AWS LoadBalancers
+        aws elbv2 describe-load-balancers --region ${{ env.AWS_REGION }} --query 'LoadBalancers[?contains(LoadBalancerName, `k8s-`)].LoadBalancerArn' --output text | while read lb_arn; do
+          if [ ! -z "$lb_arn" ]; then
+            echo "Deleting LoadBalancer: $lb_arn"
+            aws elbv2 delete-load-balancer --load-balancer-arn $lb_arn --region ${{ env.AWS_REGION }} || true
+          fi
+        done
+        
+        # Wait for cleanup
+        sleep 60
 
   terraform-destroy:
     name: Terraform Destroy Infrastructure
@@ -74,15 +91,102 @@ jobs:
       run: terraform init
       working-directory: terraform/eks/minimal
 
-    - name: Terraform Destroy
-      run: terraform destroy -auto-approve
+    - name: Terraform Destroy with Enhanced Cleanup
+      run: |
+        # First attempt
+        terraform destroy -auto-approve || {
+          echo "First destroy attempt failed, performing comprehensive cleanup..."
+          
+          # Get VPC ID for cleanup
+          VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+          
+          if [ ! -z "$VPC_ID" ]; then
+            echo "Cleaning up VPC dependencies for: $VPC_ID"
+            
+            # 1. Clean up VPC Endpoints
+            echo "Cleaning up VPC Endpoints..."
+            aws ec2 describe-vpc-endpoints --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$VPC_ID" --query 'VpcEndpoints[].VpcEndpointId' --output text | tr '\t' '\n' | while read endpoint_id; do
+              if [ ! -z "$endpoint_id" ]; then
+                echo "Deleting VPC Endpoint: $endpoint_id"
+                aws ec2 delete-vpc-endpoint --vpc-endpoint-id $endpoint_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 2. Clean up NAT Gateways
+            echo "Cleaning up NAT Gateways..."
+            aws ec2 describe-nat-gateways --region ${{ env.AWS_REGION }} --filter "Name=vpc-id,Values=$VPC_ID" --query 'NatGateways[?State!=`deleted`].NatGatewayId' --output text | tr '\t' '\n' | while read nat_id; do
+              if [ ! -z "$nat_id" ]; then
+                echo "Deleting NAT Gateway: $nat_id"
+                aws ec2 delete-nat-gateway --nat-gateway-id $nat_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 3. Clean up Network Interfaces
+            echo "Cleaning up Network Interfaces..."
+            aws ec2 describe-network-interfaces --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$VPC_ID" --query 'NetworkInterfaces[?Status!=`in-use`].NetworkInterfaceId' --output text | tr '\t' '\n' | while read eni_id; do
+              if [ ! -z "$eni_id" ]; then
+                echo "Deleting Network Interface: $eni_id"
+                aws ec2 delete-network-interface --network-interface-id $eni_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 4. Clean up Security Groups (non-default)
+            echo "Cleaning up Security Groups..."
+            aws ec2 describe-security-groups --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text | tr '\t' '\n' | while read sg_id; do
+              if [ ! -z "$sg_id" ]; then
+                echo "Deleting Security Group: $sg_id"
+                aws ec2 delete-security-group --group-id $sg_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 5. Clean up Route Tables (non-main)
+            echo "Cleaning up Route Tables..."
+            aws ec2 describe-route-tables --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$VPC_ID" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | tr '\t' '\n' | while read rt_id; do
+              if [ ! -z "$rt_id" ]; then
+                echo "Deleting Route Table: $rt_id"
+                aws ec2 delete-route-table --route-table-id $rt_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 6. Detach and Delete Internet Gateway
+            echo "Cleaning up Internet Gateway..."
+            aws ec2 describe-internet-gateways --region ${{ env.AWS_REGION }} --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[].InternetGatewayId' --output text | tr '\t' '\n' | while read igw_id; do
+              if [ ! -z "$igw_id" ]; then
+                echo "Detaching Internet Gateway: $igw_id"
+                aws ec2 detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $VPC_ID --region ${{ env.AWS_REGION }} || true
+                echo "Deleting Internet Gateway: $igw_id"
+                aws ec2 delete-internet-gateway --internet-gateway-id $igw_id --region ${{ env.AWS_REGION }} || true
+              fi
+            done
+            
+            # 7. Wait for resources to be deleted
+            echo "Waiting for resources to be fully deleted..."
+            sleep 90
+            
+            # 8. Force delete VPC if still exists
+            echo "Attempting to delete VPC manually..."
+            aws ec2 delete-vpc --vpc-id $VPC_ID --region ${{ env.AWS_REGION }} || {
+              echo "Manual VPC deletion failed, removing from Terraform state"
+              terraform state rm module.vpc.module.vpc.aws_vpc.this[0] || true
+            }
+          fi
+          
+          # Final terraform destroy attempt
+          echo "Retrying terraform destroy..."
+          terraform destroy -auto-approve || echo "Some resources may need manual cleanup"
+        }
       working-directory: terraform/eks/minimal
 
     - name: Cleanup Backend Resources
       if: github.event.inputs.target == 'all'
       run: |
         echo "Cleaning up backend resources..."
-        aws s3 rm s3://retail-store-terraform-state --recursive || true
-        aws s3 rb s3://retail-store-terraform-state || true
-        aws dynamodb delete-table --table-name retail-store-terraform-locks || true
+        # Get actual bucket name from terraform state
+        BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "retail-store-terraform-state")
+        TABLE_NAME=$(terraform output -raw dynamodb_table_name 2>/dev/null || echo "retail-store-terraform-locks")
+        
+        aws s3 rm s3://$BUCKET_NAME --recursive || true
+        aws s3 rb s3://$BUCKET_NAME || true
+        aws dynamodb delete-table --table-name $TABLE_NAME --region ${{ env.AWS_REGION }} || true
         echo "Backend cleanup completed"
+      working-directory: terraform/eks/minimal

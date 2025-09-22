@@ -101,13 +101,35 @@ kubectl apply -f https://github.com/aws-containers/retail-store-sample-app/relea
 ```
 
 #### Cleanup
+
+**Option 1: Automated Cleanup (Recommended)**
 ```bash
-# Remove application
+# Use GitHub Actions workflow for safe cleanup
+# Go to: Actions → Terraform Destroy Enhanced → Run workflow
+# Select "destroy" and choose target (all/app-only/infrastructure-only)
+```
+
+**Option 2: Manual Cleanup**
+```bash
+# Step 1: Remove application first
 kubectl delete -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml
 
-# Destroy infrastructure
+# Step 2: Clean up LoadBalancers manually if needed
+aws elbv2 describe-load-balancers --region eu-north-1 --query 'LoadBalancers[?contains(LoadBalancerName, `k8s-`)].LoadBalancerArn' --output text | while read lb_arn; do
+  aws elbv2 delete-load-balancer --load-balancer-arn $lb_arn --region eu-north-1
+done
+
+# Step 3: Wait for cleanup, then destroy infrastructure
+sleep 60
 terraform destroy
 ```
+
+**Cleanup Features:**
+- **Dependency-Aware**: Removes resources in correct order
+- **LoadBalancer Cleanup**: Automatically removes AWS ELBs
+- **Security Group Cleanup**: Handles orphaned security groups
+- **Retry Logic**: Attempts cleanup twice if first attempt fails
+- **Backend Cleanup**: Removes S3 bucket and DynamoDB table
 
 ### Monitoring and Troubleshooting
 
@@ -122,6 +144,8 @@ kubectl logs -f deployment/ui
 1. **LoadBalancer not accessible**: Ensure it's internet-facing
 2. **Pods not starting**: Check resource limits and node capacity
 3. **Database connections**: Verify service discovery and networking
+4. **Terraform destroy fails**: Use enhanced cleanup workflow or manual LoadBalancer deletion
+5. **VPC dependency errors**: Clean up security groups and ELBs before VPC deletion
 
 ### Next Steps (Bonus Objectives)
 

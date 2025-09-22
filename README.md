@@ -59,6 +59,7 @@ Read-only IAM user credentials and kubectl configuration instructions are provid
 
 - **Pull Requests**: Trigger `terraform plan`
 - **Main Branch**: Trigger `terraform apply`
+- **Cleanup**: Enhanced destroy workflow with dependency handling
 - **Security**: AWS credentials managed via GitHub secrets
 
 ## 📊 Monitoring
@@ -72,6 +73,11 @@ kubectl logs -f deployment/ui
 
 ## 🧹 Cleanup
 
+**Automated (Recommended):**
+- Use GitHub Actions: `Terraform Destroy Enhanced` workflow
+- Handles dependencies and prevents deletion errors
+
+**Manual:**
 ```bash
 kubectl delete -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml
 terraform destroy
