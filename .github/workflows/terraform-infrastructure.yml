@@ -86,6 +86,15 @@ jobs:
           fi
         done
 
+    - name: Import Existing Resources
+      working-directory: terraform/eks/minimal
+      run: |
+        # Import existing resources to avoid conflicts
+        terraform import aws_dynamodb_table.terraform_locks retail-store-terraform-locks || true
+        terraform import aws_iam_user.eks_readonly_dev retail-store-eks-readonly-dev || true
+        terraform import aws_iam_policy.eks_readonly arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/retail-store-eks-readonly || true
+        echo "Resource import completed"
+
     - name: Terraform Apply with Retry
       working-directory: terraform/eks/minimal
       run: |
