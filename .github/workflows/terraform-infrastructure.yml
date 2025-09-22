@@ -84,7 +84,11 @@ jobs:
       run: |
         echo "Checking for existing resources..."
         
-        # Try to import common conflicting resources
+        # Import existing IAM roles
+        terraform import module.retail_app_eks.module.iam_assumable_role_adot_amp.aws_iam_role.this[0] retail-store-adot-col-xray 2>/dev/null || echo "ADOT XRay role not found or already imported"
+        terraform import module.retail_app_eks.module.iam_assumable_role_adot_logs.aws_iam_role.this[0] retail-store-adot-col-logs 2>/dev/null || echo "ADOT Logs role not found or already imported"
+        
+        # Import other existing resources
         terraform import aws_kms_alias.eks_cluster alias/eks/retail-store 2>/dev/null || echo "KMS alias not found or already imported"
         terraform import aws_cloudwatch_log_group.eks_cluster /aws/eks/retail-store/cluster 2>/dev/null || echo "Log group not found or already imported"
         
