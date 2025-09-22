@@ -8,12 +8,13 @@ output "vpc_id" {
   value       = module.vpc.inner.vpc_id
 }
 
-output "s3_bucket_name" {
-  description = "S3 bucket name for state storage"
-  value       = aws_s3_bucket.terraform_state.bucket
-}
+# Backend resource outputs commented out since resources are managed externally
+# output "s3_bucket_name" {
+#   description = "S3 bucket name for state storage"
+#   value       = "gabriel-eks-state-s3-bucket"
+# }
 
-output "dynamodb_table_name" {
-  description = "DynamoDB table name for state locking"
-  value       = aws_dynamodb_table.terraform_locks.name
-}
+# output "dynamodb_table_name" {
+#   description = "DynamoDB table name for state locking"
+#   value       = "retail-store-terraform-locks"
+# }
