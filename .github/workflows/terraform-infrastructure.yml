@@ -65,13 +65,45 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Terraform Init
-      working-directory: terraform/eks/minimal
-      run: terraform init
+    - name: Network Connectivity Check
+      run: |
+        echo "Testing network connectivity..."
+        curl -I https://aws.github.io/eks-charts/index.yaml || echo "Direct connection failed"
+        nslookup aws.github.io || echo "DNS resolution failed"
 
-    - name: Terraform Apply
+    - name: Terraform Init with Retry
       working-directory: terraform/eks/minimal
-      run: terraform apply -auto-approve
+      run: |
+        for i in {1..3}; do
+          echo "Terraform init attempt $i/3"
+          if terraform init; then
+            break
+          else
+            if [ $i -eq 3 ]; then
+              exit 1
+            fi
+            sleep 15
+          fi
+        done
+
+    - name: Terraform Apply with Retry
+      working-directory: terraform/eks/minimal
+      run: |
+        # Retry terraform apply up to 3 times for network issues
+        for i in {1..3}; do
+          echo "Terraform apply attempt $i/3"
+          if terraform apply -auto-approve; then
+            echo "Terraform apply successful on attempt $i"
+            break
+          else
+            if [ $i -eq 3 ]; then
+              echo "Terraform apply failed after 3 attempts"
+              exit 1
+            fi
+            echo "Terraform apply failed on attempt $i, retrying in 30 seconds..."
+            sleep 30
+          fi
+        done
 
     - name: Output cluster info
       working-directory: terraform/eks/minimal
