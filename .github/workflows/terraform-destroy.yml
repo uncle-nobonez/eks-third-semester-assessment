@@ -90,7 +90,8 @@ jobs:
         terraform_version: ${{ env.TF_VERSION }}
 
     - name: Terraform Init with Backend
-      run: terraform init \
+      run: |
+        terraform init \
               -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
               -backend-config="key=${{ env.TF_STATE_KEY }}" \
               -backend-config="region=${{ env.AWS_REGION }}" \
