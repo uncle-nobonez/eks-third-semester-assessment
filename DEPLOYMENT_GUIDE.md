@@ -84,7 +84,7 @@ The deployment uses GitHub Actions with the following workflow:
 #### Initial Setup
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/omokarogabriel/gabriel-eks-retail-store2
 cd retail-store-sample-app/terraform/eks/minimal
 
 # Initialize Terraform with remote backend
