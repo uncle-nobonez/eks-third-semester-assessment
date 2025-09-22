@@ -79,17 +79,22 @@ jobs:
                         -backend-config="dynamodb_table=retail-store-terraform-locks" \
                         -backend-config="encrypt=true"
 
-    - name: Remove Conflicting Resources from State
+    - name: Import Existing Resources
       working-directory: terraform/eks/minimal
       run: |
-        # Remove backend resources from Terraform management since they already exist
-        terraform state rm aws_dynamodb_table.terraform_locks || true
-        terraform state rm aws_s3_bucket.terraform_state || true
-        terraform state rm aws_s3_bucket_versioning.terraform_state || true
-        terraform state rm aws_s3_bucket_server_side_encryption_configuration.terraform_state || true
-        terraform state rm aws_s3_bucket_public_access_block.terraform_state || true
-        terraform state rm random_id.bucket_suffix || true
-        echo "Backend resources removed from Terraform management"
+        # Get KMS key ID for the existing alias
+        KMS_KEY_ID=$(aws kms describe-key --key-id alias/eks/retail-store --region ${{ env.AWS_REGION }} --query 'KeyMetadata.KeyId' --output text 2>/dev/null || echo "")
+        
+        if [ ! -z "$KMS_KEY_ID" ]; then
+          echo "Importing existing KMS key and alias..."
+          terraform import module.retail_app_eks.module.eks_cluster.module.kms.aws_kms_key.this[\"cluster\"] $KMS_KEY_ID || true
+          terraform import module.retail_app_eks.module.eks_cluster.module.kms.aws_kms_alias.this[\"cluster\"] alias/eks/retail-store || true
+        fi
+        
+        # Import CloudWatch log group
+        terraform import module.retail_app_eks.module.eks_cluster.aws_cloudwatch_log_group.this[0] /aws/eks/retail-store/cluster || true
+        
+        echo "Resource import completed"
 
     - name: Terraform Apply
       working-directory: terraform/eks/minimal
