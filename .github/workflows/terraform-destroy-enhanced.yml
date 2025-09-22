@@ -194,7 +194,7 @@
 
 
 
-name: Terraform Infrastructure
+name: Terraform Destroy Enhanced
 
 on:
   push:
