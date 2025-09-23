@@ -93,6 +93,20 @@ jobs:
                         -backend-config="dynamodb_table=retail-store-terraform-locks" \
                         -backend-config="encrypt=true"
 
+    - name: Clean up IAM User Dependencies
+      working-directory: terraform/eks/minimal
+      run: |
+        echo "Cleaning up IAM user dependencies..."
+        # Delete login profile if it exists
+        aws iam delete-login-profile --user-name retail-store-eks-readonly-dev 2>/dev/null || echo "No login profile found"
+        # Delete access keys
+        aws iam list-access-keys --user-name retail-store-eks-readonly-dev --query 'AccessKeyMetadata[].AccessKeyId' --output text | while read key_id; do
+          if [ ! -z "$key_id" ]; then
+            aws iam delete-access-key --user-name retail-store-eks-readonly-dev --access-key-id $key_id || true
+          fi
+        done
+        echo "IAM user cleanup completed"
+
     - name: Terraform Destroy
       working-directory: terraform/eks/minimal
       run: terraform destroy -auto-approve
