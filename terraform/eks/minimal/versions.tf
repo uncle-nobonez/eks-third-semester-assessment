@@ -1,6 +1,14 @@
 terraform {
   required_version = ">= 1.0.0"
 
+  backend "s3" {
+    bucket         = "gabriel-eks-state-s3-bucket"
+    key            = "terraform.tfstate"
+    region         = "eu-north-1"
+    dynamodb_table = "retail-store-terraform-locks"
+    encrypt        = true
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
