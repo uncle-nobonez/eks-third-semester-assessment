@@ -1,10 +1,9 @@
 terraform {
   backend "s3" {
-    # These values will be provided during terraform init
-    # bucket         = "retail-store-terraform-state-xxxxx"
-    # key            = "terraform.tfstate"
-    # region         = "eu-north-1"
-    # dynamodb_table = "retail-store-terraform-locks"
-    # encrypt        = true
+    bucket         = "retail-store-terraform-state-uncle"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "retail-store-terraform-locks"
+    encrypt        = true
   }
 }
