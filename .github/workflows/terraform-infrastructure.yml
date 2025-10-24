@@ -144,7 +144,7 @@ jobs:
 
     - name: Terraform Apply
       working-directory: terraform/eks/minimal
-      run: terraform apply -auto-approve
+      run: terraform apply -auto-approve -lock=false
 
     - name: Output cluster info
       working-directory: terraform/eks/minimal
