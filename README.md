@@ -26,7 +26,7 @@ terraform apply
 
 ### Deploy Application
 ```bash
-aws eks --region eu-north-1 update-kubeconfig --name retail-store
+aws eks --region us-east-1 update-kubeconfig --name retail-store
 kubectl apply -f https://github.com/aws-containers/retail-store-sample-app/releases/latest/download/kubernetes.yaml
 ```
 

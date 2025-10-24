@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: eu-north-1
+  AWS_REGION: us-east-1
   TF_VERSION: 1.5.0
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
     - name: Terraform Init
       working-directory: terraform/eks/minimal
       run: |
-        terraform init -backend-config="bucket=gabriel-eks-state-s3-bucket" \
+        terraform init -backend-config="bucket=retail-store-terraform-state-uncle" \
                         -backend-config="key=terraform.tfstate" \
                         -backend-config="region=${{ env.AWS_REGION }}" \
                         -backend-config="dynamodb_table=retail-store-terraform-locks" \
@@ -73,7 +73,7 @@ jobs:
     - name: Terraform Init
       working-directory: terraform/eks/minimal
       run: |
-        terraform init -backend-config="bucket=gabriel-eks-state-s3-bucket" \
+        terraform init -backend-config="bucket=retail-store-terraform-state-uncle" \
                         -backend-config="key=terraform.tfstate" \
                         -backend-config="region=${{ env.AWS_REGION }}" \
                         -backend-config="dynamodb_table=retail-store-terraform-locks" \
