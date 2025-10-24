@@ -1,0 +1,82 @@
+name: Terraform Safe Imports
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "import" to confirm imports'
+        required: true
+        default: ''
+
+jobs:
+  terraform-imports:
+    name: Safe Terraform Imports (manual)
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'import'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Terraform Init
+      working-directory: terraform/eks/minimal
+      run: |
+        terraform init -backend-config="bucket=retail-store-terraform-state-uncle" \
+                        -backend-config="key=terraform.tfstate" \
+                        -backend-config="region=us-east-1" \
+                        -backend-config="dynamodb_table=retail-store-terraform-locks" \
+                        -backend-config="encrypt=true"
+
+    - name: Import IAM Policy if present
+      working-directory: terraform/eks/minimal
+      run: |
+        set -euo pipefail
+        POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='retail-store-eks-readonly'].Arn" --output text || true)
+        if [ -n "${POLICY_ARN}" ] && [ "${POLICY_ARN}" != "None" ]; then
+          echo "Importing IAM policy: ${POLICY_ARN}"
+          terraform import -lock=false aws_iam_policy.eks_readonly "${POLICY_ARN}" || echo "Import of IAM policy failed or already imported"
+        else
+          echo "No existing IAM policy found with name retail-store-eks-readonly"
+        fi
+
+    - name: Import KMS Alias if present
+      working-directory: terraform/eks/minimal
+      run: |
+        set -euo pipefail
+        ALIAS_NAME="alias/eks/retail-store"
+        # check if alias exists
+        if aws kms list-aliases --region us-east-1 --query "Aliases[?AliasName=='${ALIAS_NAME}']" --output text | grep -q .; then
+          echo "Importing KMS alias ${ALIAS_NAME}"
+          terraform import -lock=false module.retail_app_eks.module.eks_cluster.module.kms.aws_kms_alias.this["cluster"] "${ALIAS_NAME}" || echo "KMS alias import failed or already imported"
+        else
+          echo "KMS alias ${ALIAS_NAME} not found"
+        fi
+
+    - name: Import CloudWatch Log Group if present
+      working-directory: terraform/eks/minimal
+      run: |
+        set -euo pipefail
+        LOG_GROUP_NAME="/aws/eks/retail-store/cluster"
+        if aws logs describe-log-groups --log-group-name-prefix "${LOG_GROUP_NAME}" --region us-east-1 --query 'logGroups[?logGroupName==`'/aws/eks/retail-store/cluster'`].logGroupName' --output text | grep -q .; then
+          echo "Importing CloudWatch log group ${LOG_GROUP_NAME}"
+          terraform import -lock=false module.retail_app_eks.module.eks_cluster.aws_cloudwatch_log_group.this[0] "${LOG_GROUP_NAME}" || echo "Log group import failed or already imported"
+        else
+          echo "Log group ${LOG_GROUP_NAME} not found"
+        fi
+
+    - name: Terraform Plan (verify)
+      working-directory: terraform/eks/minimal
+      run: |
+        terraform plan -no-color
