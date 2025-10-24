@@ -15,3 +15,9 @@ variable "opentelemetry_enabled" {
   type        = bool
   default     = false
 }
+
+variable "existing_iam_policy_arn" {
+  description = "If set, use an existing IAM policy ARN instead of creating a new aws_iam_policy.eks_readonly. Leave empty to create the policy."
+  type        = string
+  default     = ""
+}
